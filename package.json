@@ -1,0 +1,14 @@
+{
+  "name": "enterprise-attendance-management-saas",
+  "version": "1.0.0",
+  "description": "Multi-Tenant Enterprise Attendance Management SaaS Platform",
+  "private": true,
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "seed": "npm --prefix backend run seed",
+    "test:e2e": "npx --prefix backend tsx backend/src/scripts/testE2E.ts"
+  }
+}
