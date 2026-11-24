@@ -32,6 +32,10 @@ import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
 import { EmployeeHistoryPage } from './pages/employee/EmployeeHistoryPage';
 import { EmployeeHolidaysPage } from './pages/employee/EmployeeHolidaysPage';
 
+// Common Account Pages
+import { ChangePasswordPage } from './pages/common/ChangePasswordPage';
+import { ChatPage } from './pages/common/ChatPage';
+
 // Root Redirector based on user role
 const RootRedirect: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -76,11 +80,13 @@ export const App: React.FC = () => {
                   <Route path="/super-admin/companies/create" element={<CreateCompanyPage />} />
                   <Route path="/super-admin/companies/:id" element={<CompanyDetailsPage />} />
                   <Route path="/super-admin/settings" element={<PlatformSettingsPage />} />
+                  <Route path="/super-admin/change-password" element={<ChangePasswordPage />} />
                 </Route>
 
                 {/* 2. Company Admin Portal */}
                 <Route element={<ProtectedRoute allowedRoles={['COMPANY_ADMIN']} />}>
                   <Route path="/company/dashboard" element={<CompanyAdminDashboard />} />
+                  <Route path="/company/chat" element={<ChatPage />} />
                   <Route path="/company/employees" element={<EmployeesPage />} />
                   <Route path="/company/departments" element={<DepartmentsPage />} />
                   <Route path="/company/attendance" element={<AttendancePage />} />
@@ -88,13 +94,16 @@ export const App: React.FC = () => {
                   <Route path="/company/reports" element={<ReportsPage />} />
                   <Route path="/company/audit-logs" element={<AuditLogsPage />} />
                   <Route path="/company/settings" element={<CompanySettingsPage />} />
+                  <Route path="/company/change-password" element={<ChangePasswordPage />} />
                 </Route>
 
                 {/* 3. Employee Self-Service Portal */}
                 <Route element={<ProtectedRoute allowedRoles={['EMPLOYEE']} />}>
                   <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
+                  <Route path="/employee/chat" element={<ChatPage />} />
                   <Route path="/employee/history" element={<EmployeeHistoryPage />} />
                   <Route path="/employee/holidays" element={<EmployeeHolidaysPage />} />
+                  <Route path="/employee/change-password" element={<ChangePasswordPage />} />
                 </Route>
               </Route>
 

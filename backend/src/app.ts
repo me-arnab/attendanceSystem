@@ -7,6 +7,7 @@ import authRoutes from './routes/authRoutes';
 import superAdminRoutes from './routes/superAdminRoutes';
 import companyRoutes from './routes/companyRoutes';
 import employeeRoutes from './routes/employeeRoutes';
+import chatRoutes from './routes/chatRoutes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -39,6 +40,7 @@ export const createApp = (): Application => {
   app.use('/api/super-admin', superAdminRoutes);
   app.use('/api/company', companyRoutes);
   app.use('/api/employee', employeeRoutes);
+  app.use('/api/chat', chatRoutes);
 
   // Fallback 404 handler
   app.use((_req: Request, res: Response) => {

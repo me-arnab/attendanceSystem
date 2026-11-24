@@ -12,6 +12,7 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { EmptyState } from '../../components/common/EmptyState';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   Users,
   PlusCircle,
@@ -29,6 +30,9 @@ import {
 } from 'lucide-react';
 
 export const EmployeesPage: React.FC = () => {
+  const { user: currentUser } = useAuth();
+  const currentUserId = currentUser?.id || currentUser?._id;
+
   const [employees, setEmployees] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +51,12 @@ export const EmployeesPage: React.FC = () => {
 
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+
+  const isEditingSelf = Boolean(
+    selectedEmployee &&
+      currentUserId &&
+      (selectedEmployee._id || selectedEmployee.id)?.toString() === currentUserId.toString()
+  );
 
   // Form State for Add / Edit
   const [formData, setFormData] = useState({
@@ -301,6 +311,9 @@ export const EmployeesPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {employees.map((emp) => {
                     const empId = emp._id || emp.id;
+                    const isCurrentUser = Boolean(
+                      currentUserId && empId && currentUserId.toString() === empId.toString()
+                    );
                     const deptName =
                       typeof emp.departmentId === 'object' && emp.departmentId !== null
                         ? emp.departmentId.name
@@ -310,7 +323,14 @@ export const EmployeesPage: React.FC = () => {
                     return (
                       <tr key={empId} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-3.5 px-6">
-                          <div className="font-semibold text-slate-900">{emp.fullName}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-semibold text-slate-900">{emp.fullName}</div>
+                            {isCurrentUser && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand-100 text-brand-800 border border-brand-200 uppercase tracking-wider">
+                                You
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-slate-400">{emp.email}</div>
                         </td>
                         <td className="py-3.5 px-6 font-mono text-xs font-bold text-brand-800">
@@ -352,17 +372,34 @@ export const EmployeesPage: React.FC = () => {
                             >
                               <Edit className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => openToggleConfirm(emp)}
-                              title={isInactive ? 'Reactivate Account' : 'Deactivate Account'}
-                              className={`p-1.5 rounded-lg hover:bg-slate-100 transition ${
-                                isInactive
-                                  ? 'text-emerald-600 hover:text-emerald-700'
-                                  : 'text-rose-500 hover:text-rose-700'
-                              }`}
-                            >
-                              {isInactive ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
-                            </button>
+                            {isCurrentUser ? (
+                              <div className="relative group inline-flex items-center">
+                                <button
+                                  type="button"
+                                  disabled
+                                  aria-label="You cannot deactivate your own administrator account"
+                                  className="p-1.5 rounded-lg text-slate-300 cursor-not-allowed opacity-50"
+                                >
+                                  <UserX className="w-4 h-4" />
+                                </button>
+                                <div className="absolute right-0 bottom-full mb-1.5 hidden group-hover:block z-50 whitespace-nowrap bg-slate-900 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-md shadow-xl pointer-events-none">
+                                  You cannot deactivate your own administrator account.
+                                  <div className="absolute right-3 top-full w-2 h-2 bg-slate-900 transform rotate-45 -mt-1"></div>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => openToggleConfirm(emp)}
+                                title={isInactive ? 'Reactivate Account' : 'Deactivate Account'}
+                                className={`p-1.5 rounded-lg hover:bg-slate-100 transition ${
+                                  isInactive
+                                    ? 'text-emerald-600 hover:text-emerald-700'
+                                    : 'text-rose-500 hover:text-rose-700'
+                                }`}
+                              >
+                                {isInactive ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -572,23 +609,53 @@ export const EmployeesPage: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
             />
 
-            <Select
-              label="Account Role"
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
-            >
-              <option value="EMPLOYEE">Employee (Self-Service)</option>
-              <option value="COMPANY_ADMIN">Company Administrator</option>
-            </Select>
+            {isEditingSelf ? (
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Account Role</label>
+                <input
+                  type="text"
+                  disabled
+                  value="Company Administrator (You)"
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-100 text-slate-500 cursor-not-allowed"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Administrator role cannot be changed on self-edit.
+                </p>
+              </div>
+            ) : (
+              <Select
+                label="Account Role"
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+              >
+                <option value="EMPLOYEE">Employee (Self-Service)</option>
+                <option value="COMPANY_ADMIN">Company Administrator</option>
+              </Select>
+            )}
 
-            <Select
-              label="Account Status"
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Select>
+            {isEditingSelf ? (
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Account Status</label>
+                <input
+                  type="text"
+                  disabled
+                  value="Active (Protected)"
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-100 text-slate-500 cursor-not-allowed"
+                />
+                <p className="text-[11px] text-amber-600 font-medium">
+                  You cannot deactivate your own administrator account.
+                </p>
+              </div>
+            ) : (
+              <Select
+                label="Account Status"
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </Select>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">

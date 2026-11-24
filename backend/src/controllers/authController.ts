@@ -1,11 +1,12 @@
 import { Request, Response } from 'express';
 import { User } from '../models/User';
 import { Company } from '../models/Company';
-import { loginSchema } from '../validators/authValidators';
+import { loginSchema, changePasswordSchema } from '../validators/authValidators';
 import { signToken } from '../utils/jwt';
 import { sendSuccess, sendError } from '../utils/response';
 import { processLoginAttendance, getTimezoneDateInfo } from '../services/attendanceService';
 import { Attendance } from '../models/Attendance';
+import { logAudit } from '../services/auditService';
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -160,4 +161,80 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
 
 export const logout = async (_req: Request, res: Response): Promise<void> => {
   sendSuccess(res, null, 'Logged out successfully');
+};
+
+export const changePassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 'Authentication required.', 401);
+      return;
+    }
+
+    // Role check: Allow COMPANY_ADMIN, EMPLOYEE, and SUPER_ADMIN
+    const allowedRoles = ['COMPANY_ADMIN', 'EMPLOYEE', 'SUPER_ADMIN'];
+    if (!allowedRoles.includes(req.user.role)) {
+      sendError(res, 'Unauthorized to perform password change.', 403);
+      return;
+    }
+
+    const parseResult = changePasswordSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      const errorMsg = parseResult.error.errors[0]?.message || 'Invalid password data provided.';
+      sendError(res, errorMsg, 400, parseResult.error.errors);
+      return;
+    }
+
+    const { currentPassword, newPassword } = parseResult.data;
+
+    // Identify user exclusively from authenticated JWT user ID
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      sendError(res, 'User account not found.', 404);
+      return;
+    }
+
+    if (user.status !== 'active') {
+      sendError(res, 'Account is inactive. Password change is disabled.', 403);
+      return;
+    }
+
+    // Verify current password using bcrypt
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      sendError(res, 'Incorrect current password.', 400);
+      return;
+    }
+
+    // Verify new password is not identical to current password
+    const isSamePassword = await user.comparePassword(newPassword);
+    if (isSamePassword) {
+      sendError(res, 'New password cannot be identical to your current password.', 400);
+      return;
+    }
+
+    // Update password (pre('save') hook handles bcrypt hashing)
+    user.password = newPassword;
+    await user.save();
+
+    // Audit log without passwords or sensitive tokens
+    await logAudit({
+      companyId: user.companyId || null,
+      actorId: user._id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'CHANGE_PASSWORD',
+      entityType: 'User',
+      entityId: user._id.toString(),
+      details: {
+        email: user.email,
+        role: user.role,
+      },
+      ipAddress: req.ip,
+    });
+
+    sendSuccess(res, null, 'Password changed successfully.');
+  } catch (error: any) {
+    console.error('[AuthController.changePassword] Error:', error);
+    sendError(res, 'Failed to update password. Please try again.', 500);
+  }
 };

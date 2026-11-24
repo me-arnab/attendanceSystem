@@ -360,8 +360,81 @@ export const updateEmployee = async (req: Request, res: Response): Promise<void>
     if (data.joiningDate !== undefined) {
       employee.joiningDate = data.joiningDate ? new Date(data.joiningDate) : undefined;
     }
-    if (data.role) employee.role = data.role;
-    if (data.status) employee.status = data.status;
+
+    // Role modification checks
+    if (data.role && data.role !== employee.role) {
+      if (employee.role === 'COMPANY_ADMIN' && data.role === 'EMPLOYEE') {
+        if (req.user && req.user._id.toString() === employee._id.toString()) {
+          sendError(res, 'You cannot change your own administrator role.', 403);
+          return;
+        }
+        const activeAdminCount = await User.countDocuments({
+          companyId,
+          role: 'COMPANY_ADMIN',
+          status: 'active',
+        });
+        if (activeAdminCount <= 1) {
+          sendError(res, 'Cannot demote the last active administrator for this company.', 409);
+          return;
+        }
+      }
+      employee.role = data.role;
+    }
+
+    // Status modification checks
+    if (data.status && data.status !== employee.status) {
+      if (data.status === 'inactive') {
+        // Prevent self-deactivation
+        if (req.user && req.user._id.toString() === employee._id.toString()) {
+          await logAudit({
+            companyId,
+            actorId: req.user._id,
+            actorName: req.user.fullName,
+            actorRole: req.user.role,
+            action: 'REJECTED_SELF_DEACTIVATION',
+            entityType: 'User',
+            entityId: employee._id.toString(),
+            details: {
+              reason: 'Administrator attempted to deactivate their own account via update.',
+              targetEmail: employee.email,
+              targetRole: employee.role,
+            },
+          });
+          sendError(res, 'You cannot deactivate your own administrator account.', 403);
+          return;
+        }
+
+        // Protect the last active company admin
+        if (employee.role === 'COMPANY_ADMIN') {
+          const activeAdminCount = await User.countDocuments({
+            companyId,
+            role: 'COMPANY_ADMIN',
+            status: 'active',
+          });
+          if (activeAdminCount <= 1) {
+            if (req.user) {
+              await logAudit({
+                companyId,
+                actorId: req.user._id,
+                actorName: req.user.fullName,
+                actorRole: req.user.role,
+                action: 'REJECTED_LAST_ADMIN_DEACTIVATION',
+                entityType: 'User',
+                entityId: employee._id.toString(),
+                details: {
+                  reason: 'Cannot deactivate the last active administrator for this company.',
+                  targetEmail: employee.email,
+                  targetRole: employee.role,
+                },
+              });
+            }
+            sendError(res, 'Cannot deactivate the last active administrator for this company.', 409);
+            return;
+          }
+        }
+      }
+      employee.status = data.status;
+    }
 
     if (data.departmentId !== undefined) {
       if (data.departmentId) {
@@ -422,6 +495,56 @@ export const toggleEmployeeStatus = async (req: Request, res: Response): Promise
       return;
     }
 
+    // 1. PREVENT SELF-DEACTIVATION
+    if (status === 'inactive' && req.user && req.user._id.toString() === employee._id.toString()) {
+      await logAudit({
+        companyId,
+        actorId: req.user._id,
+        actorName: req.user.fullName,
+        actorRole: req.user.role,
+        action: 'REJECTED_SELF_DEACTIVATION',
+        entityType: 'User',
+        entityId: employee._id.toString(),
+        details: {
+          reason: 'Administrator attempted to deactivate their own account.',
+          targetEmail: employee.email,
+          targetRole: employee.role,
+        },
+      });
+      sendError(res, 'You cannot deactivate your own administrator account.', 403);
+      return;
+    }
+
+    // 2. PROTECT THE LAST ACTIVE COMPANY ADMIN
+    if (status === 'inactive' && employee.role === 'COMPANY_ADMIN') {
+      const activeAdminCount = await User.countDocuments({
+        companyId,
+        role: 'COMPANY_ADMIN',
+        status: 'active',
+      });
+      if (activeAdminCount <= 1) {
+        if (req.user) {
+          await logAudit({
+            companyId,
+            actorId: req.user._id,
+            actorName: req.user.fullName,
+            actorRole: req.user.role,
+            action: 'REJECTED_LAST_ADMIN_DEACTIVATION',
+            entityType: 'User',
+            entityId: employee._id.toString(),
+            details: {
+              reason: 'Cannot deactivate the last active administrator for this company.',
+              targetEmail: employee.email,
+              targetRole: employee.role,
+            },
+          });
+        }
+        sendError(res, 'Cannot deactivate the last active administrator for this company.', 409);
+        return;
+      }
+    }
+
+    const previousStatus = employee.status;
     employee.status = status;
     await employee.save();
 
@@ -431,10 +554,16 @@ export const toggleEmployeeStatus = async (req: Request, res: Response): Promise
         actorId: req.user._id,
         actorName: req.user.fullName,
         actorRole: req.user.role,
-        action: status === 'inactive' ? 'EMPLOYEE_DEACTIVATED' : 'EMPLOYEE_REACTIVATED',
+        action: status === 'inactive' ? 'DEACTIVATE_USER' : 'ACTIVATE_USER',
         entityType: 'User',
         entityId: employee._id.toString(),
-        details: { status },
+        details: {
+          previousStatus,
+          newStatus: status,
+          targetName: employee.fullName,
+          targetEmail: employee.email,
+          targetRole: employee.role,
+        },
       });
     }
 

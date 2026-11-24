@@ -462,3 +462,139 @@ export const updatePlatformSettings = async (req: Request, res: Response): Promi
     sendError(res, 'Failed to update platform settings.', 500);
   }
 };
+
+/**
+ * Toggle User Status (Activate / Deactivate) by Super Admin
+ */
+export const toggleUserStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['active', 'inactive'].includes(status)) {
+      sendError(res, "Status must be 'active' or 'inactive'.", 400);
+      return;
+    }
+
+    const targetUser = await User.findById(id);
+    if (!targetUser) {
+      sendError(res, 'User not found.', 404);
+      return;
+    }
+
+    // 1. Prevent Super Admin from deactivating themselves
+    if (status === 'inactive' && req.user && req.user._id.toString() === targetUser._id.toString()) {
+      if (req.user) {
+        await logAudit({
+          companyId: targetUser.companyId || null,
+          actorId: req.user._id,
+          actorName: req.user.fullName,
+          actorRole: req.user.role,
+          action: 'REJECTED_SELF_DEACTIVATION',
+          entityType: 'User',
+          entityId: targetUser._id.toString(),
+          details: {
+            reason: 'Super Admin attempted to deactivate their own account.',
+            targetEmail: targetUser.email,
+            targetRole: targetUser.role,
+          },
+        });
+      }
+      sendError(res, 'You cannot deactivate your own Super Admin account.', 403);
+      return;
+    }
+
+    // 2. Prevent deactivating the last active SUPER_ADMIN
+    if (status === 'inactive' && targetUser.role === 'SUPER_ADMIN') {
+      const activeSuperAdminCount = await User.countDocuments({
+        role: 'SUPER_ADMIN',
+        status: 'active',
+      });
+      if (activeSuperAdminCount <= 1) {
+        if (req.user) {
+          await logAudit({
+            companyId: null,
+            actorId: req.user._id,
+            actorName: req.user.fullName,
+            actorRole: req.user.role,
+            action: 'REJECTED_LAST_ADMIN_DEACTIVATION',
+            entityType: 'User',
+            entityId: targetUser._id.toString(),
+            details: {
+              reason: 'Cannot deactivate the last active Super Admin. Platform must retain at least one active Super Admin.',
+              targetEmail: targetUser.email,
+              targetRole: targetUser.role,
+            },
+          });
+        }
+        sendError(
+          res,
+          'Cannot deactivate the last active Super Admin. The platform must retain at least one active Super Admin.',
+          409
+        );
+        return;
+      }
+    }
+
+    // 3. Prevent deactivating the last active COMPANY_ADMIN of a company
+    if (status === 'inactive' && targetUser.role === 'COMPANY_ADMIN' && targetUser.companyId) {
+      const activeCompanyAdminCount = await User.countDocuments({
+        companyId: targetUser.companyId,
+        role: 'COMPANY_ADMIN',
+        status: 'active',
+      });
+      if (activeCompanyAdminCount <= 1) {
+        if (req.user) {
+          await logAudit({
+            companyId: targetUser.companyId,
+            actorId: req.user._id,
+            actorName: req.user.fullName,
+            actorRole: req.user.role,
+            action: 'REJECTED_LAST_ADMIN_DEACTIVATION',
+            entityType: 'User',
+            entityId: targetUser._id.toString(),
+            details: {
+              reason: 'Cannot deactivate the last active administrator for this company.',
+              targetEmail: targetUser.email,
+              targetRole: targetUser.role,
+            },
+          });
+        }
+        sendError(res, 'Cannot deactivate the last active administrator for this company.', 409);
+        return;
+      }
+    }
+
+    const previousStatus = targetUser.status;
+    targetUser.status = status;
+    await targetUser.save();
+
+    if (req.user) {
+      await logAudit({
+        companyId: targetUser.companyId || null,
+        actorId: req.user._id,
+        actorName: req.user.fullName,
+        actorRole: req.user.role,
+        action: status === 'inactive' ? 'DEACTIVATE_USER' : 'ACTIVATE_USER',
+        entityType: 'User',
+        entityId: targetUser._id.toString(),
+        details: {
+          previousStatus,
+          newStatus: status,
+          targetName: targetUser.fullName,
+          targetEmail: targetUser.email,
+          targetRole: targetUser.role,
+        },
+      });
+    }
+
+    sendSuccess(
+      res,
+      { id: targetUser._id, status: targetUser.status },
+      `User has been ${status === 'active' ? 'reactivated' : 'deactivated'}.`
+    );
+  } catch (error: any) {
+    console.error('[SuperAdminController.toggleUserStatus] Error:', error);
+    sendError(res, 'Failed to change user status.', 500);
+  }
+};

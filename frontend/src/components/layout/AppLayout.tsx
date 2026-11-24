@@ -19,6 +19,8 @@ import {
   Clock,
   History,
   CalendarDays,
+  KeyRound,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -44,12 +46,14 @@ export const AppLayout: React.FC = () => {
         { name: 'Companies', path: '/super-admin/companies', icon: <Building2 className="w-4 h-4" /> },
         { name: 'Register Company', path: '/super-admin/companies/create', icon: <ShieldCheck className="w-4 h-4" /> },
         { name: 'Platform Settings', path: '/super-admin/settings', icon: <Settings className="w-4 h-4" /> },
+        { name: 'Change Password', path: '/super-admin/change-password', icon: <KeyRound className="w-4 h-4" /> },
       ];
     }
 
     if (user.role === 'COMPANY_ADMIN') {
       return [
         { name: 'Dashboard', path: '/company/dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
+        { name: 'Company Chat', path: '/company/chat', icon: <MessageSquare className="w-4 h-4" /> },
         { name: 'Employees', path: '/company/employees', icon: <Users className="w-4 h-4" /> },
         { name: 'Departments', path: '/company/departments', icon: <FolderTree className="w-4 h-4" /> },
         { name: 'Attendance', path: '/company/attendance', icon: <CalendarCheck className="w-4 h-4" /> },
@@ -57,14 +61,17 @@ export const AppLayout: React.FC = () => {
         { name: 'Reports', path: '/company/reports', icon: <FileBarChart className="w-4 h-4" /> },
         { name: 'Audit Logs', path: '/company/audit-logs', icon: <ClipboardList className="w-4 h-4" /> },
         { name: 'Company Settings', path: '/company/settings', icon: <Settings className="w-4 h-4" /> },
+        { name: 'Change Password', path: '/company/change-password', icon: <KeyRound className="w-4 h-4" /> },
       ];
     }
 
     // EMPLOYEE
     return [
       { name: 'My Dashboard', path: '/employee/dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
+      { name: 'Company Chat', path: '/employee/chat', icon: <MessageSquare className="w-4 h-4" /> },
       { name: 'Attendance History', path: '/employee/history', icon: <History className="w-4 h-4" /> },
       { name: 'Holidays', path: '/employee/holidays', icon: <CalendarDays className="w-4 h-4" /> },
+      { name: 'Change Password', path: '/employee/change-password', icon: <KeyRound className="w-4 h-4" /> },
     ];
   };
 

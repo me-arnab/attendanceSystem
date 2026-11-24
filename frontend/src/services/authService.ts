@@ -30,4 +30,8 @@ export const authService = {
       removeToken();
     }
   },
+
+  changePassword: async (data: { currentPassword: string; newPassword: string; confirmPassword?: string }): Promise<void> => {
+    return api.post('/auth/change-password', data);
+  },
 };

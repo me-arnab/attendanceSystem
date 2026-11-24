@@ -6,6 +6,7 @@ import {
   getCompanyDetails,
   updateCompany,
   toggleCompanyStatus,
+  toggleUserStatus,
   getPlatformSettings,
   updatePlatformSettings,
 } from '../controllers/superAdminController';
@@ -26,6 +27,7 @@ router.post('/companies', createCompany);
 router.get('/companies/:id', getCompanyDetails);
 router.put('/companies/:id', updateCompany);
 router.patch('/companies/:id/status', toggleCompanyStatus);
+router.patch('/users/:id/status', toggleUserStatus);
 
 router.put('/settings', updatePlatformSettings);
 
