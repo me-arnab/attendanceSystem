@@ -50,7 +50,6 @@ jobs:
     needs: pre-deploy-validation
     environment:
       name: production
-      url: ${{ secrets.FRONTEND_URL }}
     steps:
       - name: Verify required deployment secrets are configured
         run: |
