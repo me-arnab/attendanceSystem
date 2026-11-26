@@ -216,7 +216,7 @@ export const createEmployee = async (req: Request, res: Response): Promise<void>
     const companyId = getTenantId(req);
     const parsed = createEmployeeSchema.safeParse(req.body);
     if (!parsed.success) {
-      sendError(res, 'Validation error', 422, parsed.error.errors);
+      sendError(res, 'Validation error', 422, parsed.error.issues);
       return;
     }
 
@@ -305,7 +305,7 @@ export const updateEmployee = async (req: Request, res: Response): Promise<void>
 
     const parsed = updateEmployeeSchema.safeParse(req.body);
     if (!parsed.success) {
-      sendError(res, 'Validation error', 422, parsed.error.errors);
+      sendError(res, 'Validation error', 422, parsed.error.issues);
       return;
     }
 
@@ -608,7 +608,7 @@ export const createDepartment = async (req: Request, res: Response): Promise<voi
     const companyId = getTenantId(req);
     const parsed = departmentSchema.safeParse(req.body);
     if (!parsed.success) {
-      sendError(res, 'Validation error', 422, parsed.error.errors);
+      sendError(res, 'Validation error', 422, parsed.error.issues);
       return;
     }
 
@@ -656,7 +656,7 @@ export const updateDepartment = async (req: Request, res: Response): Promise<voi
     const { id } = req.params;
     const parsed = updateDepartmentSchema.safeParse(req.body);
     if (!parsed.success) {
-      sendError(res, 'Validation error', 422, parsed.error.errors);
+      sendError(res, 'Validation error', 422, parsed.error.issues);
       return;
     }
 
@@ -791,7 +791,7 @@ export const correctAttendance = async (req: Request, res: Response): Promise<vo
 
     const parsed = manualCorrectionSchema.safeParse(req.body);
     if (!parsed.success) {
-      sendError(res, 'Validation error', 422, parsed.error.errors);
+      sendError(res, 'Validation error', 422, parsed.error.issues);
       return;
     }
 
@@ -953,7 +953,7 @@ export const updateCompanySettings = async (req: Request, res: Response): Promis
     const companyId = getTenantId(req);
     const parsed = updateCompanySchema.safeParse(req.body);
     if (!parsed.success) {
-      sendError(res, 'Validation error', 422, parsed.error.errors);
+      sendError(res, 'Validation error', 422, parsed.error.issues);
       return;
     }
 

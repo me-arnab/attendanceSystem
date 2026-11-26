@@ -12,7 +12,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const parseResult = loginSchema.safeParse(req.body);
     if (!parseResult.success) {
-      sendError(res, 'Invalid credentials provided.', 422, parseResult.error.errors);
+      sendError(res, 'Invalid credentials provided.', 422, parseResult.error.issues);
       return;
     }
 
@@ -179,8 +179,8 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
 
     const parseResult = changePasswordSchema.safeParse(req.body);
     if (!parseResult.success) {
-      const errorMsg = parseResult.error.errors[0]?.message || 'Invalid password data provided.';
-      sendError(res, errorMsg, 400, parseResult.error.errors);
+      const errorMsg = parseResult.error.issues[0]?.message || 'Invalid password data provided.';
+      sendError(res, errorMsg, 400, parseResult.error.issues);
       return;
     }
 

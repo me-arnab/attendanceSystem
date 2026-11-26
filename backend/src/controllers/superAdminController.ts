@@ -184,7 +184,7 @@ export const createCompany = async (req: Request, res: Response): Promise<void> 
   try {
     const parsed = createCompanySchema.safeParse(req.body);
     if (!parsed.success) {
-      sendError(res, 'Validation error', 422, parsed.error.errors);
+      sendError(res, 'Validation error', 422, parsed.error.issues);
       return;
     }
 
@@ -293,7 +293,7 @@ export const updateCompany = async (req: Request, res: Response): Promise<void> 
     const { id } = req.params;
     const parsed = updateCompanySchema.safeParse(req.body);
     if (!parsed.success) {
-      sendError(res, 'Validation error', 422, parsed.error.errors);
+      sendError(res, 'Validation error', 422, parsed.error.issues);
       return;
     }
 
