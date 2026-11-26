@@ -1,0 +1,78 @@
+name: Branch Sync (main to develop)
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: sync-main-to-develop
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-develop-with-main:
+    name: Sync main back to develop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate GitHub App installation token (if configured)
+        id: app-token
+        if: ${{ vars.GH_APP_ID != '' }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Check if develop exists and needs sync
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        run: |
+          if ! git ls-remote --exit-code --heads origin develop >/dev/null 2>&1; then
+            echo "Remote branch 'develop' does not exist yet; skipping branch sync."
+            exit 0
+          fi
+
+          git fetch origin main develop
+          BEHIND_COUNT=$(git rev-list --count origin/develop..origin/main)
+          if [ "$BEHIND_COUNT" -eq 0 ]; then
+            echo "develop is already up to date with main."
+            exit 0
+          fi
+
+          echo "develop is ${BEHIND_COUNT} commit(s) behind main. Checking merge compatibility..."
+          git checkout -B develop origin/develop
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if ! git merge --no-commit --no-ff origin/main; then
+            echo "ERROR: Merge conflict detected syncing main into develop. Manual resolution required."
+            git merge --abort || true
+            exit 1
+          fi
+          git merge --abort || true
+
+          EXISTING_PR=$(gh pr list --base develop --head main --state open --json number --jq '.[0].number')
+          if [ -z "$EXISTING_PR" ]; then
+            PR_URL=$(gh pr create \
+              --base develop \
+              --head main \
+              --title "chore(sync): sync main into develop" \
+              --body "Automated sync Pull Request bringing commits from \`main\` (e.g. hotfixes or squash merges) back into \`develop\`.")
+            PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+            echo "Created sync PR #${PR_NUMBER}"
+          else
+            PR_NUMBER="$EXISTING_PR"
+            echo "Found existing sync PR #${PR_NUMBER}"
+          fi
+
+          gh pr merge "$PR_NUMBER" --auto --merge || echo "Auto-merge could not be enabled yet (ensure repository auto-merge is enabled in GitHub settings)."

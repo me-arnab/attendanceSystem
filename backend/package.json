@@ -7,7 +7,11 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
-    "seed": "tsx src/scripts/seed.ts"
+    "seed": "tsx src/scripts/seed.ts",
+    "test:safety": "tsx src/scripts/testSafetyChecks.ts",
+    "test:chat": "tsx src/scripts/testChat.ts",
+    "test:realtime": "tsx src/scripts/testRealtime.ts",
+    "test:date-separators": "tsx src/scripts/testChatDateSeparators.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -1,0 +1,85 @@
+name: Branch Promotion (develop to main)
+
+on:
+  push:
+    branches:
+      - develop
+
+concurrency:
+  group: promote-develop-to-main
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-compatibility-and-promote:
+    name: Verify Merge Compatibility & Promote to Main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate GitHub App installation token (if configured)
+        id: app-token
+        if: ${{ vars.GH_APP_ID != '' }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Check if develop is ahead of main and merge-compatible
+        run: |
+          git fetch origin main
+          AHEAD_COUNT=$(git rev-list --count origin/main..HEAD)
+          if [ "$AHEAD_COUNT" -eq 0 ]; then
+            echo "develop has no commits ahead of main; skipping promotion PR."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if ! git merge --no-commit --no-ff origin/main; then
+            echo "ERROR: Merge conflict detected between develop and main. Manual resolution required."
+            git merge --abort || true
+            exit 1
+          fi
+          git merge --abort || true
+          echo "OK: develop merges cleanly into main (${AHEAD_COUNT} commit(s) ahead)."
+
+      - name: Create or update promotion PR targeting main
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        run: |
+          if [ -z "${{ steps.app-token.outputs.token }}" ]; then
+            echo "::warning::GH_APP_ID/GH_APP_PRIVATE_KEY not configured; using GITHUB_TOKEN. Note: GitHub suppresses deploy.yml on main if PR auto-merge is executed by GITHUB_TOKEN."
+          fi
+
+          git fetch origin main
+          AHEAD_COUNT=$(git rev-list --count origin/main..HEAD)
+          if [ "$AHEAD_COUNT" -eq 0 ]; then
+            exit 0
+          fi
+
+          EXISTING_PR=$(gh pr list --base main --head develop --state open --json number --jq '.[0].number')
+
+          if [ -z "$EXISTING_PR" ]; then
+            PR_URL=$(gh pr create \
+              --base main \
+              --head develop \
+              --title "release: promote develop to main" \
+              --body "Automated promotion Pull Request from \`develop\` to \`main\`. Squash auto-merge will complete once all required CI checks pass.")
+            PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+            echo "Created promotion PR #${PR_NUMBER}"
+          else
+            PR_NUMBER="$EXISTING_PR"
+            echo "Updated existing promotion PR #${PR_NUMBER}"
+          fi
+
+          gh pr merge "$PR_NUMBER" --auto --squash || echo "Auto-merge could not be enabled yet (ensure repository auto-merge and branch protection are enabled in GitHub settings)."

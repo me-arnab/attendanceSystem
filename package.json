@@ -9,6 +9,11 @@
     "build:backend": "npm --prefix backend run build",
     "build:frontend": "npm --prefix frontend run build",
     "seed": "npm --prefix backend run seed",
-    "test:e2e": "npx --prefix backend tsx backend/src/scripts/testE2E.ts"
+    "test:e2e": "npx --prefix backend tsx backend/src/scripts/testE2E.ts",
+    "test:safety": "npm --prefix backend run test:safety",
+    "test:chat": "npm --prefix backend run test:chat",
+    "test:realtime": "npm --prefix backend run test:realtime",
+    "test:date-separators": "npm --prefix backend run test:date-separators",
+    "test:frontend": "npx --prefix backend tsx frontend/src/utils/dateUtils.test.ts"
   }
 }
